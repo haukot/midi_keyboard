@@ -11,6 +11,13 @@ const int hallSensorPin = A0;   // The pin number of the Hall sensor.
 float minVoltage = 500;        // Minimum expected voltage from the Hall sensor.
 float maxVoltage = 650;  // could be up to 800      // Maximum expected voltage from the Hall sensor.
 
+// Velocity
+unsigned long lastMeasurementTime = 0;
+const float targetVoltage = 3.0;
+unsigned long time1, time2, time3;
+float distance1, distance2, distance3;
+bool measurementTaken = false;
+
 
 void setup() {
   setup_display();
@@ -45,6 +52,9 @@ void setup_display() {
 void loop() {
   static unsigned long timer10 = millis();
   static unsigned long timer100 = millis();
+
+  unsigned long currentTime = micros(); // Current time in milliseconds
+
   // TODO: на самом деле надо будет иметь небольшой промежуток между сенсором и магнитом - 
   // и самая пиковая часть мб и уйдет - и станет ровнее
   // Сейчас все равно несколько криво
@@ -74,7 +84,6 @@ void loop() {
   float voltage = hallValue * (5.0 / 1023.0);
 
   float distance_calc = C[0]*cbrtf(hallValue) + C[1]*sqrtf(hallValue) + C[2]*hallValue;
-
   // чтобы было положительным, и целым
   float distance = (50 + distance_calc) * 100; 
 
@@ -83,9 +92,65 @@ void loop() {
 
     // Serial.print(voltage*100);
     // Serial.print(",");
-    Serial.println(getDistance(distance));
+
+    //Serial.println(getDistance(distance));
+
     // вольтаж 2.46 - хз почему для экрана надо умножать
     sevseg.setNumber(voltage*10, 1);
+  }
+
+  if (!measurementTaken && voltage >= targetVoltage) {
+
+    time2 = currentTime;
+    distance2 = distance;
+
+    // У chimaera было по трем точкам? но зачем по трем?
+    float velocity = ((distance2 - distance1) * 1000) / (time2 - time1);  // Divide by 1000.0 to convert time difference to seconds
+
+    Serial.print("Voltage: ");
+    Serial.println(voltage);    
+    Serial.print("Current distance: ");
+    Serial.println(distance);
+
+    // Print the acceleration
+    Serial.print("Time: ");
+    Serial.print(time1);
+    Serial.print(",");
+    Serial.print(time2);
+    Serial.print(",");
+
+    Serial.print("Time diff:");
+    Serial.print(time2 - time1);
+    Serial.println();
+
+    Serial.print("Distance diff:");
+    Serial.print(distance2 - distance1);
+    Serial.println();
+
+    Serial.print("Distance: ");
+    Serial.print(distance1);
+    Serial.print(",");
+    Serial.print(distance2);
+    Serial.println();
+    Serial.print("Acceleration at approximately 4V: ");
+    Serial.println(velocity);
+
+    Serial.println();
+    
+    measurementTaken = true; // Prevents multiple measurements
+  }
+  if (measurementTaken && voltage < targetVoltage - 0.1) { // 0.1 чтобы не прям сразу срабатывало
+    measurementTaken = false;
+    time1 = time2 = 0;
+    distance1 = distance2 = 0;
+  }
+
+  if (currentTime - lastMeasurementTime >= 1 * 1000) { // 5 milliseconds
+    // Velocity - Shift the data
+    time1 = currentTime;
+    distance1 = distance;
+
+    lastMeasurementTime = currentTime; 
   }
   
   // // delay(10)
